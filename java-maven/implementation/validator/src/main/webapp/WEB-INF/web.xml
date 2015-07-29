@@ -7,11 +7,16 @@
     <servlet>
         <servlet-name>validator</servlet-name>
         <servlet-class>org.nlp2rdf.implementation.validator.ValidateWS</servlet-class>
+        
+        <init-param>
+            <param-name>logDirectory</param-name>
+            <param-value>/RDFUnitLog</param-value>
+        </init-param>
     </servlet>
 
     <servlet-mapping>
         <servlet-name>validator</servlet-name>
-        <url-pattern>/validator</url-pattern>
+        <url-pattern>/validate</url-pattern>
     </servlet-mapping>
 
 </web-app>

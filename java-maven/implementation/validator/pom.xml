@@ -8,8 +8,8 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>validator</artifactId>
-    <packaging>jar</packaging>
+    <artifactId>rdfunit</artifactId>
+    <packaging>war</packaging>
 
     <name>NIF RDFUnit Validator</name>
     <dependencies>
