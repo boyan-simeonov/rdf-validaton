@@ -81,6 +81,10 @@ public class ParameterParser {
 				"a string specifying the config of the component.")
 				.withRequiredArg();
 
+		parser.acceptsAll(asList("id", "simmoID"),
+				"a string specifying the simmo id.")
+				.withRequiredArg();
+
 		// parameter that are expected to exist
 		parser.acceptsAll(
 				asList("f", "informat"),

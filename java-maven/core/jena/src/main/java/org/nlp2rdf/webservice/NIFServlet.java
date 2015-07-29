@@ -15,6 +15,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.security.InvalidParameterException;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Properties;
 
 /**
  * User: hellmann
@@ -41,7 +44,7 @@ public abstract class NIFServlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) throws ServletException, IOException {
-        handle(httpServletRequest, httpServletResponse);
+         handle(httpServletRequest, httpServletResponse);
     }
 
     public abstract OntModel execute(NIFParameters nifParameters) throws Exception;
@@ -80,7 +83,11 @@ public abstract class NIFServlet extends HttpServlet {
             out.setNsPrefix("p", defaultPrefix);
             log.debug("NIF Component executed task: " + logMonitor(mon.stop()));
             //write the response
-            write(httpServletResponse, out, nifParameters.getOutputFormat());
+
+            String id = httpServletRequest.getParameter("id");
+            if (id == null) id = (String) nifParameters.getOptions().valueOf("id");
+
+            write(httpServletResponse, out, nifParameters.getOutputFormat(), id);
             log.info("output (" + nifParameters.getOutputFormat() + ", " + nifParameters.getOutputFormat() + ") written, triples from input: " + nifParameters.getInputModel().size() + ", added by component: " + out.size());
             writeJamonLog();
 
@@ -116,7 +123,10 @@ public abstract class NIFServlet extends HttpServlet {
         return "needed: " + m.getLastValue() + " ms. (" + m.getTotal() + " total)";
     }
 
-    protected void write(HttpServletResponse httpServletResponse, OntModel out, String format) throws IOException {
+    protected void
+write(HttpServletResponse httpServletResponse, OntModel out, String format, String id) throws IOException {
+
+        if (id != null) writeFileArchive(id, out);
 
         //this is the printer where the output has to be on
         OutputStream outputStream = httpServletResponse.getOutputStream();
@@ -160,29 +170,6 @@ public abstract class NIFServlet extends HttpServlet {
         httpServletResponse.setContentType(contentType);
         httpServletResponse.setCharacterEncoding("UTF-8");
 
-        /*out.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-        out.setNsPrefix("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
-        out.setNsPrefix("owl", "http://www.w3.org/2002/07/owl#");
-
-
-        out.setNsPrefix("sso", "http://nlp2rdf.lod2.eu/schema/sso/");
-        out.setNsPrefix("str", "http://nlp2rdf.lod2.eu/schema/string/");
-        out.setNsPrefix("topic", "http://nlp2rdf.lod2.eu/schema/topic/");
-        out.setNsPrefix("error", "http://nlp2rdf.lod2.eu/schema/error/");
-
-
-        out.setNsPrefix("olia", "http://purl.org/olia/olia.owl#");
-        out.setNsPrefix("olia-top", "http://purl.org/olia/olia-top.owl#");
-        out.setNsPrefix("olia_system", "http://purl.org/olia/system.owl#");
-
-        out.setNsPrefix("penn", "http://purl.org/olia/penn.owl#");
-        out.setNsPrefix("penn-syntax", "http://purl.org/olia/penn-syntax.owl#");
-        out.setNsPrefix("stanford", "http://purl.org/olia/stanford.owl#");
-
-        out.setNsPrefix("brown", "http://purl.org/olia/brown.owl#");
-         */
-
-
         try {
             if (outputWriter != null)
                 outputWriter.write(out);
@@ -190,9 +177,11 @@ public abstract class NIFServlet extends HttpServlet {
                 outputStream.write(outputStream.toString().getBytes());
             }
         } catch (RDFWriterException e) {
+            httpServletResponse.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             System.err.println("Cannot write to output: " + e.getMessage());
             e.printStackTrace();
         }
+
 
         //RDFWriter writer = out.getWriter(jenaFormat);
         //writer.setProperty("showXmlDeclaration", "true");
@@ -201,6 +190,74 @@ public abstract class NIFServlet extends HttpServlet {
         outputStream.close();
 
 
+    }
+
+    private void writeFileArchive(String id, OntModel out){
+        String simmoID[] = id.split("/");
+        File htmlDir = new File(System.getProperty( "catalina.base" ) + "/webapps/validation-results/html/" + simmoID[simmoID.length - 1] + ".html");
+        File htmlf = new File(System.getProperty( "catalina.base" ) + "/webapps/validation-results/html");
+        File turtleDir = new File(System.getProperty( "catalina.base" ) + "/webapps/validation-results/turtle/" + simmoID[simmoID.length - 1] + ".ttl");
+        File turtlef = new File(System.getProperty( "catalina.base" ) + "/webapps/validation-results/turtle");
+
+        if(htmlf.listFiles() != null && htmlf.listFiles().length >= 500) {
+            File [] files = htmlDir.listFiles();
+            Arrays.sort(files, new Comparator<File>() {
+                public int compare(File f1, File f2) {
+                    return Long.compare(f1.lastModified(), f2.lastModified());
+                }
+            });
+            files[0].delete();
+        }
+
+        if(turtlef.listFiles() != null && turtlef.listFiles().length >= 500) {
+            File [] files = htmlDir.listFiles();
+            Arrays.sort(files, new Comparator<File>() {
+                public int compare(File f1, File f2) {
+                    return Long.compare(f1.lastModified(), f2.lastModified());
+                }
+            });
+            files[0].delete();
+        }
+
+        OutputStream fosHtml = null;
+        OutputStream fosTurtle = null;
+        try {
+            fosHtml = new FileOutputStream(htmlDir);
+            fosTurtle = new FileOutputStream(turtleDir);
+            RDFWriter outputStreamTurtle = new RDFStreamWriter(fosTurtle, "TURTLE");
+            RDFWriter outputStreamHTML = RDFWriterFactory.createHTMLWriter(TestCaseExecutionType.rlogTestCaseResult, fosHtml);
+
+            if (outputStreamTurtle != null) {
+                try {
+                    outputStreamTurtle.write(out);
+                } catch (RDFWriterException e) {
+                    e.printStackTrace();
+                }
+
+                try {
+                    outputStreamHTML.write(out);
+                } catch (RDFWriterException e) {
+                    e.printStackTrace();
+                }
+            }
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } finally {
+            if (fosHtml != null) try {
+                fosHtml.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            if (fosTurtle != null) {
+                try {
+                    fosTurtle.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     protected void writeError(String error, HttpServletResponse httpServletResponse) throws IOException {
